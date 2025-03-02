@@ -27,7 +27,7 @@ public class Main : AdminModule
     public override string ModuleName => "IksAdmin_VipManage";
     public override string ModuleVersion => "1.0.0";
     public override string ModuleAuthor => "iks__";
-    public override string ModuleDescription => "For IksAdmin 3.0";
+    public override string ModuleDescription => "For IksAdmin 3.0 | Sponsored by Armatura";
     private string _dbString = "";
     public static PluginConfig Config = null!;
 

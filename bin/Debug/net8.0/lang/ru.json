@@ -1,0 +1,7 @@
+{
+    "MenuTitle.VipManage" : "Управление VIP",
+    "MenuOption.VipManage" : "Управление VIP",
+    "MenuOption.Give" : "Выдать VIP",
+    "MenuOption.Edit" : "Редактировать VIP",
+    "MenuOption.Delete" : "Удалить VIP"
+}

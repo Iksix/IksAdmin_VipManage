@@ -12,9 +12,9 @@ public class PluginConfig : PluginCFG<PluginConfig>
 	public string User { get; set; } = "user";
 	public string Pass { get; set; } = "pass";
 	public uint Port { get; set; } = 3306;
-	public int Sid { get; set; } = 0;
     public string[] Groups {get; set;} = [ "VIP", "PREMIUM" ];
     // ===
+	public int Sid { get; set; } = 0;
 
     public static void Set()
     {

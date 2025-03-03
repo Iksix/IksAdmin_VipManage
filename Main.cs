@@ -1,10 +1,14 @@
-﻿using CounterStrikeSharp.API.Core;
+﻿using System.Security.Cryptography.X509Certificates;
+using System.Text.Json.Serialization;
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Capabilities;
+using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Menu;
 using Dapper;
 using IksAdminApi;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MySqlConnector;
 using VipCoreApi;
 
@@ -14,6 +18,9 @@ public class VipModel {
 	public long AccountId {get; set;}
 	public string Group {get; set;}
 	public long Expires {get; set;}
+	
+	[JsonIgnore]
+	public bool IsExpired {get => Expires < DateTimeOffset.UtcNow.ToUnixTimeSeconds();} 
 
 	public VipModel(long accountId, string group, long expires) {
 		AccountId = accountId;
@@ -35,6 +42,8 @@ public class Main : AdminModule
 
 	private static PluginCapability<IVipCoreApi> _vipApiCapability = new("vipcore:core");
     public static IVipCoreApi? VipApi;
+	private bool _vipSharp = false;
+	public int ServerId;
 
     public override void Ready()
     {
@@ -49,6 +58,11 @@ public class Main : AdminModule
         builder.Port = Config.Port;
         builder.Database = Config.Database;
         _dbString = builder.ToString();
+		if (Config.VipByPisex) {
+			ServerId = Config.Sid;
+		} else {
+			_vipSharp = true;
+		}
 		Api.RegisterPermission("other.vip_manage", "z");
     }
     public override void OnAllPluginsLoaded(bool hotReload)
@@ -57,6 +71,7 @@ public class Main : AdminModule
 		try
         {
             VipApi = _vipApiCapability.Get();
+			ServerId = VipApi!.GetServerId();
         }
         catch (Exception _)
         {
@@ -84,31 +99,101 @@ public class Main : AdminModule
         if (menu.Id != "iksadmin:menu:main") return HookResult.Continue;
         
 		menu.AddMenuOption("vip_manage", Localizer["MenuOption.VipManage"], (_, _) => {
-			OpenVipManageMenu(player, menu);
+			OpenSelectPlayerMenu(player, menu);
 		}, viewFlags: AdminUtils.GetCurrentPermissionFlags("other.vip_manage"));
 
         return HookResult.Continue;
     }
 
-    private void OpenVipManageMenu(CCSPlayerController caller, IDynamicMenu? backMenu = null!)
+    private void OpenVipManageMenu(CCSPlayerController caller, CCSPlayerController target, IDynamicMenu? backMenu = null!)
     {
         var menu = Api.CreateMenu(
 			"vip_manage.main",
-			Localizer["MenuTitle.VipManage"]
+			Localizer["MenuTitle.VipManage"],
+			backMenu: backMenu
 		);
 
-		menu.AddMenuOption("give", Localizer["MenuOption.Give"], (_, _) => {
+		var accountId = target.AuthorizedSteamID!.AccountId;
+		var group = _playerVipGroup[target.Slot];
+		var groups = _vipSharp ? VipApi!.GetVipGroups() : Config.Groups;
 
+		menu.AddMenuOption("group:" + group.Group, Localizer["MenuOption.Group"].AReplace(["group"], [group.Group]), (_, _) => {
+			MenuUtils.SelectItemDefault<string?>(caller, "vm_group", groups.ToList()!, (g, mn) => {
+				mn.BackAction = caller => {
+					OpenVipManageMenu(caller, target, menu);
+				};
+				_playerVipGroup[target.Slot].Group = g!;
+				OpenVipManageMenu(caller, target, menu);
+				Task.Run(async () => {
+					await UpdateVip(accountId, group);
+					Server.NextFrame(() => {
+						UpdateVipOnServer(target);
+					});
+				});
+			});
 		});
 
-		menu.AddMenuOption("edit", Localizer["MenuOption.Edit"], (_, _) => {
+		menu.AddMenuOption("expires:" + group.Expires, Localizer["MenuOption.Expires"].AReplace(["date"], [group.Expires != -1 ? Utils.GetDateString((int)group.Expires) : "NONE"]), (_, _) => {
+			caller.Print(Localizer["Message.WriteTime"]);
+			Api.HookNextPlayerMessage(caller, s => {
+				var fs = s.ToCharArray()[0];
+				switch (fs)
+				{
+					case '+':
+						group.Expires += long.Parse(s.Remove(0, 1))*60;
+						break;
+					case '-':
+						group.Expires -= long.Parse(s.Remove(0, 1))*60;
+						break;
+					default:
+						group.Expires = long.Parse(s)*60;
+						break;
+				}
+				OpenVipManageMenu(caller, target, menu);
+				Task.Run(async () => {
+					await UpdateVip(accountId, group);
+					Server.NextFrame(() => {
+						UpdateVipOnServer(target);
+					});
+				});
+			});
+		}, disabled: group.Group == "");
 
-		});
+		menu.Open(caller);
+    }
 
-		menu.AddMenuOption("delete", Localizer["MenuOption.Delete"], (_, _) => {
+    private void UpdateVipOnServer(CCSPlayerController target)
+    {
+        if (_vipSharp)
+		{
+			Server.ExecuteCommand("css_reload_vip_player " + target.GetSteamId());
+		} else {
+			Server.ExecuteCommand("mm_reload_vip " + target.AuthorizedSteamID!.AccountId);
+		}
+    }
 
-		});
+    private void OpenSelectPlayerMenu(CCSPlayerController caller, IDynamicMenu? backMenu = null!)
+    {
+        var menu = Api.CreateMenu(
+			"vip_manage.sp",
+			Localizer["MenuOption.Give"],
+			backMenu: backMenu
+		);
+		var players = PlayersUtils.GetOnlinePlayers().Where(x => _playerVipGroup[x.Slot].Expires != -1).ToList();
 
+		foreach (var p in players)
+		{
+			menu.AddMenuOption("edit", Localizer["MenuOption.Edit"], (_, _) => {
+				if (_playerVipGroup[p.Slot].Expires != -1)
+				{
+					// Редактирование вип пользователя
+					OpenVipManageMenu(caller, p, menu);
+				} else {
+					// Добавление вип пользователя
+				}
+			});
+		}
+		
 		menu.Open(caller);
     }
 
@@ -120,25 +205,6 @@ public class Main : AdminModule
 		_playerVipGroup[slot] = new VipModel(0, "", -1);
 		return HookResult.Continue;
 	}
-
-	public static string PlayerVipGroup(CCSPlayerController player)
-    {
-        try
-        {
-            if (VipApi != null)
-            {
-                if (VipApi.IsClientVip(player))
-                    return VipApi!.GetClientVipGroup(player);
-            }
-            if (_playerVipGroup[player.Slot].Expires > AdminUtils.CurrentTimestamp() || _playerVipGroup[player.Slot].Expires == 0)
-                return _playerVipGroup[player.Slot].Group;
-            return "";
-        }
-        catch (System.Exception)
-        {
-            return "";
-        }
-    }
 	public static string[] VipGroups() {
 		if (VipApi != null)
 		{
@@ -147,7 +213,7 @@ public class Main : AdminModule
 		return Config.Groups;
 	}
 
-    public async Task<VipModel> GetPlayerVipGroup(int accountId)
+    public async Task<VipModel> GetPlayerVipGroup(long accountId)
     {
         try
 		{
@@ -170,6 +236,29 @@ public class Main : AdminModule
 				return new VipModel(accountId, "", -1);
 			}
 			return group;
+		}
+		catch (Exception ex)
+		{
+			Exception e = ex;
+			Console.WriteLine(e);
+			throw;
+		}
+    }
+	public async Task UpdateVip(long accountId, VipModel vipModel)
+    {
+        try
+		{
+			MySqlConnection conn = new MySqlConnection(_dbString);
+			await conn.OpenAsync();
+			await conn.ExecuteAsync(@"
+			UPDATE `vip_users` SET `group` = @group, `expires` = @expires WHERE `account_id` = @accountId and sid = @sid",
+			new
+			{
+				group = vipModel.Group,
+				expires = vipModel.Expires,
+				accountId,
+				sid = ServerId
+			});
 		}
 		catch (Exception ex)
 		{

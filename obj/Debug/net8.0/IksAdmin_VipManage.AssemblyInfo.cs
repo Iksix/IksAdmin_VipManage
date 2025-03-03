@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IksAdmin_VipManage")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d57dbf2357b7495e8ca82d117632cafbcb1a74d0")]
 [assembly: System.Reflection.AssemblyProductAttribute("IksAdmin_VipManage")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IksAdmin_VipManage")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

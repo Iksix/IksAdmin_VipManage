@@ -65,6 +65,10 @@ public class Main : AdminModule
 		}
 		Api.RegisterPermission("other.vip_manage", "z");
     }
+    public override void Unload(bool hotReload)
+    {
+        Api.MenuOpenPre -= OnMenuOpenPre;
+    }
     public override void OnAllPluginsLoaded(bool hotReload)
     {
         base.OnAllPluginsLoaded(hotReload);
@@ -108,7 +112,7 @@ public class Main : AdminModule
     private void OpenVipManageMenu(CCSPlayerController caller, CCSPlayerController target, IDynamicMenu? backMenu = null!)
     {
         var menu = Api.CreateMenu(
-			"vip_manage.main",
+			"vip_manage.main_edit",
 			Localizer["MenuTitle.VipManage"],
 			backMenu: backMenu
 		);
@@ -120,10 +124,10 @@ public class Main : AdminModule
 		menu.AddMenuOption("group:" + group.Group, Localizer["MenuOption.Group"].AReplace(["group"], [group.Group]), (_, _) => {
 			MenuUtils.SelectItemDefault<string?>(caller, "vm_group", groups.ToList()!, (g, mn) => {
 				mn.BackAction = caller => {
-					OpenVipManageMenu(caller, target, menu);
+					OpenVipManageMenu(caller, target, backMenu);
 				};
 				_playerVipGroup[target.Slot].Group = g!;
-				OpenVipManageMenu(caller, target, menu);
+				OpenVipManageMenu(caller, target, backMenu);
 				Task.Run(async () => {
 					await UpdateVip(accountId, group);
 					Server.NextFrame(() => {
@@ -146,16 +150,75 @@ public class Main : AdminModule
 						group.Expires -= long.Parse(s.Remove(0, 1))*60;
 						break;
 					default:
-						group.Expires = long.Parse(s)*60;
+						group.Expires = AdminUtils.CurrentTimestamp() + long.Parse(s)*60;
 						break;
 				}
-				OpenVipManageMenu(caller, target, menu);
+				OpenVipManageMenu(caller, target, backMenu);
 				Task.Run(async () => {
 					await UpdateVip(accountId, group);
 					Server.NextFrame(() => {
 						UpdateVipOnServer(target);
 					});
 				});
+			});
+		}, disabled: group.Group == "");
+
+		menu.Open(caller);
+    }
+
+	private void OpenVipAddMenu(CCSPlayerController caller, CCSPlayerController target, IDynamicMenu? backMenu = null!)
+    {
+        var menu = Api.CreateMenu(
+			"vip_manage.main_add",
+			Localizer["MenuTitle.VipGive"],
+			backMenu: backMenu
+		);
+
+		var accountId = target.AuthorizedSteamID!.AccountId;
+		var group = _playerVipGroup[target.Slot];
+		var groups = _vipSharp ? VipApi!.GetVipGroups() : Config.Groups;
+		var name = target.PlayerName;
+		menu.AddMenuOption("give" + group.Group, Localizer["MenuOption.Give"], (_, _) => {
+			if (backMenu != null) {
+				backMenu.Open(caller);
+			} else {
+				Api.CloseMenu(caller);
+			}
+			Task.Run(async () => {
+				
+				await InsertVip(accountId, name, group);
+				Server.NextFrame(() => {
+					UpdateVipOnServer(target);
+				});
+			});
+		});
+		menu.AddMenuOption("group:" + group.Group, Localizer["MenuOption.Group"].AReplace(["group"], [group.Group]), (_, _) => {
+			MenuUtils.SelectItemDefault<string?>(caller, "vm_group", groups.ToList()!, (g, mn) => {
+				mn.BackAction = caller => {
+					OpenVipAddMenu(caller, target, backMenu);
+				};
+				_playerVipGroup[target.Slot].Group = g!;
+				OpenVipAddMenu(caller, target, backMenu);
+			});
+		});
+
+		menu.AddMenuOption("expires:" + group.Expires, Localizer["MenuOption.Expires"].AReplace(["date"], [group.Expires != -1 ? Utils.GetDateString((int)group.Expires) : "NONE"]), (_, _) => {
+			caller.Print(Localizer["Message.WriteTime"]);
+			Api.HookNextPlayerMessage(caller, s => {
+				var fs = s.ToCharArray()[0];
+				switch (fs)
+				{
+					case '+':
+						group.Expires += long.Parse(s.Remove(0, 1))*60;
+						break;
+					case '-':
+						group.Expires -= long.Parse(s.Remove(0, 1))*60;
+						break;
+					default:
+						group.Expires = AdminUtils.CurrentTimestamp() + long.Parse(s)*60;
+						break;
+				}
+				OpenVipAddMenu(caller, target, backMenu);
 			});
 		}, disabled: group.Group == "");
 
@@ -179,17 +242,18 @@ public class Main : AdminModule
 			Localizer["MenuOption.Give"],
 			backMenu: backMenu
 		);
-		var players = PlayersUtils.GetOnlinePlayers().Where(x => _playerVipGroup[x.Slot].Expires != -1).ToList();
+		var players = PlayersUtils.GetOnlinePlayers().ToList();
 
 		foreach (var p in players)
 		{
-			menu.AddMenuOption("edit", Localizer["MenuOption.Edit"], (_, _) => {
+			menu.AddMenuOption(p.GetSteamId(), p.PlayerName, (_, _) => {
 				if (_playerVipGroup[p.Slot].Expires != -1)
 				{
 					// Редактирование вип пользователя
 					OpenVipManageMenu(caller, p, menu);
 				} else {
 					// Добавление вип пользователя
+					OpenVipAddMenu(caller, p, menu);
 				}
 			});
 		}
@@ -219,20 +283,24 @@ public class Main : AdminModule
 		{
 			MySqlConnection conn = new MySqlConnection(_dbString);
 			await conn.OpenAsync();
+			Console.WriteLine("Getting for " + accountId);
 			var group = await conn.QueryFirstOrDefaultAsync<VipModel>(@"
 			select 
-			group as group,
 			account_id as accountId,
+			`group` as `group`,
 			expires as expires
-			from `vip_users` where (`account_id` = @accountId) and (`expires` > @dateNow or `expires` = 0) and sid = @sid
+			from vip_users 
+			where (account_id = @accountId) 
+			and sid = @sid
 			", new
 			{
 				accountId,
-				dateNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-				sid = Config.Sid
+				dateNow = AdminUtils.CurrentTimestamp(),
+				sid = ServerId
 			});
 			if (group == null)
 			{
+				Console.WriteLine("Group is null ");
 				return new VipModel(accountId, "", -1);
 			}
 			return group;
@@ -256,6 +324,35 @@ public class Main : AdminModule
 			{
 				group = vipModel.Group,
 				expires = vipModel.Expires,
+				accountId,
+				sid = ServerId
+			});
+		}
+		catch (Exception ex)
+		{
+			Exception e = ex;
+			Console.WriteLine(e);
+			throw;
+		}
+    }
+	public async Task InsertVip(long accountId, string name, VipModel vip)
+    {
+        try
+		{
+			MySqlConnection conn = new MySqlConnection(_dbString);
+			await conn.OpenAsync();
+			await conn.ExecuteAsync(@"
+			insert into vip_users
+			(account_id, name, lastvisit, sid, `group`, expires)
+			values
+			(@accountId, @name, @timestamp, @sid, @group, @expires)
+			",
+			new
+			{
+				name,
+				timestamp = AdminUtils.CurrentTimestamp(),
+				group = vip.Group,
+				expires = vip.Expires,
 				accountId,
 				sid = ServerId
 			});

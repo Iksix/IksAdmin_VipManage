@@ -13,6 +13,7 @@ public class PluginConfig : PluginCFG<PluginConfig>
 	public string Pass { get; set; } = "pass";
 	public uint Port { get; set; } = 3306;
     public string[] Groups {get; set;} = [ "VIP", "PREMIUM" ];
+    public string AdminPermissionFlags {get; set;} = "z";
     // ===
 	public int Sid { get; set; } = 0;
 

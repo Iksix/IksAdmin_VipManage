@@ -1,31 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "E:\\__iksAdmin\\IksAdmin_Modules\\IksAdmin_VipManage\\IksAdmin_VipManage.csproj": {}
+    "/Users/alexandrdanilyev/Documents/Work/CS/plugins/IksAdmin_VipManage/IksAdmin_VipManage.csproj": {}
   },
   "projects": {
-    "E:\\__iksAdmin\\IksAdmin_Modules\\IksAdmin_VipManage\\IksAdmin_VipManage.csproj": {
+    "/Users/alexandrdanilyev/Documents/Work/CS/plugins/IksAdmin_VipManage/IksAdmin_VipManage.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\__iksAdmin\\IksAdmin_Modules\\IksAdmin_VipManage\\IksAdmin_VipManage.csproj",
+        "projectUniqueName": "/Users/alexandrdanilyev/Documents/Work/CS/plugins/IksAdmin_VipManage/IksAdmin_VipManage.csproj",
         "projectName": "IksAdmin_VipManage",
-        "projectPath": "E:\\__iksAdmin\\IksAdmin_Modules\\IksAdmin_VipManage\\IksAdmin_VipManage.csproj",
-        "packagesPath": "C:\\Users\\iputg\\.nuget\\packages\\",
-        "outputPath": "E:\\__iksAdmin\\IksAdmin_Modules\\IksAdmin_VipManage\\obj\\",
+        "projectPath": "/Users/alexandrdanilyev/Documents/Work/CS/plugins/IksAdmin_VipManage/IksAdmin_VipManage.csproj",
+        "packagesPath": "/Users/alexandrdanilyev/.nuget/packages/",
+        "outputPath": "/Users/alexandrdanilyev/Documents/Work/CS/plugins/IksAdmin_VipManage/obj/",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
-          "C:\\Users\\iputg\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "/Users/alexandrdanilyev/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -51,7 +45,7 @@
           "dependencies": {
             "CounterStrikeSharp.Api": {
               "target": "Package",
-              "version": "[1.0.305, )"
+              "version": "[*, )"
             },
             "Dapper": {
               "target": "Package",
@@ -78,7 +72,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.406/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/8.0.300/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

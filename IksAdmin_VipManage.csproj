@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.Api" Version="1.0.305" />
-    <Reference Include="E:\__iksAdmin\Iks_Admin\IksAdmin\build\IksAdmin\shared\IksAdminApi\IksAdminApi.dll"/>
+    <PackageReference Include="CounterStrikeSharp.Api" Version="*" />
+    <Reference Include="./IksAdminApi.dll"/>
     <Reference Include="./VipCoreApi.dll" />
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="MySqlConnector" Version="2.3.6" />

@@ -20,6 +20,7 @@ LRMini/.idea
 *.pdb
 *.CopyComplete
 *.txt
+*.sln
 
 .idea
 /bin

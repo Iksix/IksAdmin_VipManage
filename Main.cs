@@ -1,14 +1,11 @@
-﻿using System.Security.Cryptography.X509Certificates;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Capabilities;
-using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Menu;
 using Dapper;
 using IksAdminApi;
-using Microsoft.Extensions.Options;
 using MySqlConnector;
 using VipCoreApi;
 
@@ -56,7 +53,7 @@ public class Main : AdminModule
         PluginConfig.Set();
         Config = PluginConfig.Config;
         Api.MenuOpenPre += OnMenuOpenPre;
-        
+
         if (Config.VipByPisex)
         {
             var builder = new MySqlConnectionStringBuilder();
@@ -313,13 +310,10 @@ public class Main : AdminModule
             await conn.OpenAsync();
             Console.WriteLine("Getting for " + accountId);
             var group = await conn.QueryFirstOrDefaultAsync<VipModel>(@"
-			select 
-			account_id as accountId,
-			`group` as `group`,
-			expires as expires
-			from vip_users 
-			where (account_id = @accountId) 
-			and sid = @sid
+			    SELECT account_id as accountId, `group` as `group`, expires as expires
+			    FROM vip_users 
+			    WHERE (account_id = @accountId) 
+			    AND sid = @sid
 			", new
             {
                 accountId,
@@ -349,14 +343,17 @@ public class Main : AdminModule
             MySqlConnection conn = new MySqlConnection(_dbString);
             await conn.OpenAsync();
             await conn.ExecuteAsync(@"
-			UPDATE `vip_users` SET `group` = @group, `expires` = @expires WHERE `account_id` = @accountId and sid = @sid",
-                new
-                {
-                    group = vipModel.Group,
-                    expires = vipModel.Expires,
-                    accountId,
-                    sid = ServerId
-                });
+			    UPDATE `vip_users`
+			    SET `group` = @group, `expires` = @expires
+			    WHERE `account_id` = @accountId 
+			    AND sid = @sid
+			", new
+            {
+                group = vipModel.Group,
+                expires = vipModel.Expires,
+                accountId,
+                sid = ServerId
+            });
         }
         catch (Exception ex)
         {
@@ -368,25 +365,30 @@ public class Main : AdminModule
 
     public async Task InsertVip(long accountId, string name, VipModel vip)
     {
+        if (vip.Group == "" || vip.Expires == -1 || accountId == 0)
+        {
+            Console.WriteLine("Vip group is empty or expires is -1 or account id is 0");
+            return;
+        }
+
         try
         {
             MySqlConnection conn = new MySqlConnection(_dbString);
             await conn.OpenAsync();
             await conn.ExecuteAsync(@"
-			insert into vip_users
-			(account_id, name, lastvisit, sid, `group`, expires)
-			values
-			(@accountId, @name, @timestamp, @sid, @group, @expires)
-			",
-                new
-                {
-                    name,
-                    timestamp = AdminUtils.CurrentTimestamp(),
-                    group = vip.Group,
-                    expires = vip.Expires,
-                    accountId,
-                    sid = ServerId
-                });
+			    INSERT INTO vip_users
+			    (account_id, name, lastvisit, sid, `group`, expires)
+			    VALUES
+			    (@accountId, @name, @timestamp, @sid, @group, @expires)
+			", new
+            {
+                name,
+                timestamp = AdminUtils.CurrentTimestamp(),
+                group = vip.Group,
+                expires = vip.Expires,
+                accountId,
+                sid = ServerId
+            });
         }
         catch (Exception ex)
         {

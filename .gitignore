@@ -1,0 +1,28 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Rider ignored files
+/modules.xml
+/contentModel.xml
+/projectSettingsUpdater.xml
+/.idea.LRMini.iml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+LRMini/.idea
+*.user
+*.cache
+*.editorconfig
+*.dll
+*.json
+*.pdb
+*.CopyComplete
+*.txt
+*.sln
+
+.idea
+/bin
+/obj
+.DS_Store

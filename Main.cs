@@ -3,6 +3,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Core.Capabilities;
+using CounterStrikeSharp.API.Modules.Entities;
 using CounterStrikeSharp.API.Modules.Menu;
 using Dapper;
 using IksAdminApi;
@@ -13,9 +14,9 @@ namespace IksAdmin_VipManage;
 
 public class VipModel
 {
-    public long AccountId { get; set; }
+    public int AccountId { get; set; }
     public string Group { get; set; }
-    public long Expires { get; set; }
+    public uint Expires { get; set; }
 
     [JsonIgnore]
     public bool IsExpired
@@ -23,7 +24,7 @@ public class VipModel
         get => Expires < DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
-    public VipModel(long accountId, string group, long expires)
+    public VipModel(int accountId, string group, uint expires)
     {
         AccountId = accountId;
         Group = group;
@@ -71,6 +72,15 @@ public class Main : AdminModule
         }
 
         Api.RegisterPermission("other.vip_manage", Config.AdminPermissionFlags);
+        
+        RegisterListener<Listeners.OnClientAuthorized>(OnAuth);
+    }
+
+    private void OnAuth(int playerSlot, SteamID steamId)
+    {
+        var accountId = steamId.AccountId;
+        var slot = playerSlot;
+        Task.Run(async () => { _playerVipGroup[slot] = await GetPlayerVipGroup(accountId); });
     }
 
     public override void Unload(bool hotReload)
@@ -92,20 +102,7 @@ public class Main : AdminModule
             AdminUtils.LogDebug("Start without Vip(Cs#)");
         }
     }
-
-    [GameEventHandler]
-    public HookResult OnPlayerConnect(EventPlayerConnectFull @event, GameEventInfo info)
-    {
-        var player = @event.Userid;
-        if (player == null || player.AuthorizedSteamID == null) return HookResult.Continue;
-
-        var accountId = player.AuthorizedSteamID.AccountId;
-        var slot = player.Slot;
-        Task.Run(async () => { _playerVipGroup[slot] = await GetPlayerVipGroup(accountId); });
-
-        return HookResult.Continue;
-    }
-
+    
 
     private HookResult OnMenuOpenPre(CCSPlayerController player, IDynamicMenu menu, IMenu gameMenu)
     {
@@ -134,7 +131,7 @@ public class Main : AdminModule
             MenuUtils.SelectItemDefault<string?>(caller, "vm_group", groups.ToList()!, (g, mn) =>
             {
                 mn.BackAction = caller => { OpenVipManageMenu(caller, target, backMenu); };
-                _playerVipGroup[target.Slot].Group = g!;
+                _playerVipGroup[target.Slot].Group = g ?? "";
                 OpenVipManageMenu(caller, target, backMenu);
                 Task.Run(async () =>
                 {
@@ -154,13 +151,13 @@ public class Main : AdminModule
                     switch (fs)
                     {
                         case '+':
-                            group.Expires += long.Parse(s.Remove(0, 1)) * 60;
+                            group.Expires += uint.Parse(s.Remove(0, 1)) * 60;
                             break;
                         case '-':
-                            group.Expires -= long.Parse(s.Remove(0, 1)) * 60;
+                            group.Expires -= uint.Parse(s.Remove(0, 1)) * 60;
                             break;
                         default:
-                            group.Expires = AdminUtils.CurrentTimestamp() + long.Parse(s) * 60;
+                            group.Expires = (uint)(AdminUtils.CurrentTimestamp() + int.Parse(s) * 60);
                             break;
                     }
 
@@ -210,7 +207,7 @@ public class Main : AdminModule
             MenuUtils.SelectItemDefault<string?>(caller, "vm_group", groups.ToList()!, (g, mn) =>
             {
                 mn.BackAction = caller => { OpenVipAddMenu(caller, target, backMenu); };
-                _playerVipGroup[target.Slot].Group = g!;
+                _playerVipGroup[target.Slot].Group = g ?? "";
                 OpenVipAddMenu(caller, target, backMenu);
             });
         });
@@ -225,13 +222,13 @@ public class Main : AdminModule
                     switch (fs)
                     {
                         case '+':
-                            group.Expires += long.Parse(s.Remove(0, 1)) * 60;
+                            group.Expires += uint.Parse(s.Remove(0, 1)) * 60;
                             break;
                         case '-':
-                            group.Expires -= long.Parse(s.Remove(0, 1)) * 60;
+                            group.Expires -= uint.Parse(s.Remove(0, 1)) * 60;
                             break;
                         default:
-                            group.Expires = AdminUtils.CurrentTimestamp() + long.Parse(s) * 60;
+                            group.Expires = (uint)(AdminUtils.CurrentTimestamp() + uint.Parse(s) * 60);
                             break;
                     }
 
@@ -288,7 +285,7 @@ public class Main : AdminModule
     {
         if (@event.Userid == null) return HookResult.Continue;
         int slot = @event.Userid.Slot;
-        _playerVipGroup[slot] = new VipModel(0, "", -1);
+        _playerVipGroup[slot] = new VipModel(0, "", 0);
         return HookResult.Continue;
     }
 
@@ -323,7 +320,7 @@ public class Main : AdminModule
             if (group == null)
             {
                 Console.WriteLine("Group is null ");
-                return new VipModel(accountId, "", -1);
+                return new VipModel((int)accountId, "", 0);
             }
 
             return group;
